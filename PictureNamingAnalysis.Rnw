@@ -1,0 +1,343 @@
+\documentclass[a4paper]{article}
+\usepackage{Sweave}
+\usepackage{fixltx2e}
+
+\usepackage[margin=1.0in]{geometry}
+
+ \DefineVerbatimEnvironment{Sinput}{Verbatim} { frame = lines, fontshape = sl}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{frame=lines, fontshape = sl}
+
+\title{Picture Naming Study: Analysis}
+\author{Abhilasha Kumar}
+<<echo=FALSE>>=
+options(width=60)
+library(xtable)
+library(ggplot2)
+library(ggthemes)
+library(gridExtra)
+library(tidyr)
+library(sjPlot)
+@
+
+<<>>=
+sjp.setTheme(base = theme_few())
+@
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+ \maketitle
+
+\section{Reading File}
+
+<<>>=
+pic = read.csv("Compiled_FINAL_CSV.csv", header = TRUE, sep = ",")
+pic_mainvariables = pic[, c(2,3,22,26,28,31,33,37,38,39, 8)]
+colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object", "PictureType", "RT", "ObjectNo", "Name", "InvalidTrial", "Accuracy", "ItemCount")
+
+pic_mainvariables_valid = subset(pic_mainvariables, pic_mainvariables$InvalidTrial == "0")
+
+@
+
+\section{Making the z-scores}
+
+<<>>=
+library(dplyr)
+pic_firsttrim = pic_mainvariables_valid %>% filter( RT > 250 & RT < 5000)
+
+## aggregate per subject all IVs and DVs
+meanRT = group_by(pic_firsttrim, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT) = c("Subject", "MeanRT")
+
+sdRT = group_by(pic_firsttrim, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT) = c("Subject", "sdRT")
+
+RT_agg = merge(meanRT, sdRT, by = "Subject")
+
+## merge aggregate info with long data
+pic_z = merge(pic_firsttrim, RT_agg, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+pic_z = pic_z %>% mutate(zRT = (RT - MeanRT)/sdRT)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(pic_z, Subject) %>%
+  summarise_at(vars(zRT), mean)
+
+write.csv(pic_z, file="pic_z.csv")
+@
+
+
+\section {Histograms for raw and z-RT}
+\subsection *{Raw RT}
+<<>>=
+library(ggplot2)
+library(ggthemes)
+ggplot(pic_mainvariables_valid, aes(x = RT))+
+geom_histogram(binwidth = 200, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("Raw RT Histogram for Valid Trials")
+@
+\subsection *{z RT}
+<<>>=
+ggplot(pic_z, aes(x = zRT))+
+geom_histogram(binwidth = 0.5, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("z-RT Histogram for above 250 ms & <5s Trials")
+@
+
+\subsection *{Trimming zRT}
+<<>>=
+## trimming above and below 3 s.d. 
+pic_z_trimmed = subset(pic_z, pic_z$zRT < 3 & pic_z$zRT > -3)
+
+ggplot(pic_z_trimmed, aes(x = zRT))+
+geom_histogram(binwidth = 0.25, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("Trimmed (3 SD) z-RT Histogram for above 250 ms & <5s Trials")
+## now we need to repeat the z-scoring for these items -- in the next section
+@
+\section {Repeat z-scoring after trimming}
+<<>>=
+library(dplyr)
+
+## aggregate per subject all IVs and DVs
+meanRT_trim = group_by(pic_z_trimmed, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_trim) = c("Subject", "MeanRT_trim")
+
+sdRT_trim = group_by(pic_z_trimmed, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_trim) = c("Subject", "sdRT_trim")
+
+RT_agg_trim = merge(meanRT_trim, sdRT_trim, by = "Subject")
+
+## merge aggregate info with long data
+new_pic_z = merge(pic_z_trimmed, RT_agg_trim, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+new_pic_z = new_pic_z %>% mutate(zRT_trim = (RT - MeanRT_trim)/sdRT_trim)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(new_pic_z, Subject) %>%
+  summarise_at(vars(zRT), mean)
+
+write.csv(new_pic_z, file="final_pic_z.csv")
+@
+
+\section {Excluding Subjects}
+
+<<>>=
+## we exclude some subjects from all further RT analyses here
+library(dplyr)
+numitems = group_by(pic_mainvariables, Subject, ItemCount)%>%
+    summarise(count = n())
+
+## At this point, we have 58 subjects: S1 and S2 have incorrect # items, so we remove that. 
+## And, S56, 59, 54, 57 and 60 removed for counterbalacing purposes at this point
+
+new_pic_z_final = new_pic_z %>% filter(!Subject %in% c(1,2,56,54,57,60,59)) 
+
+agg_sub = group_by(pic_mainvariables, Subject)%>%
+    summarise_at(vars(Accuracy), mean)
+# which(agg_sub$Accuracy < 0.51)
+
+## Subject 4 is at 50% accuracy, so we remove them too
+new_pic_z_final = 
+  subset(new_pic_z_final, new_pic_z_final$Subject != 4)
+@
+
+\section {Aggregating RTs and Accuracy}
+<<>>=
+library(dplyr)
+
+agg_pic_validRT = group_by(new_pic_z_final, Subject, PictureType)%>%
+    summarise_at(vars(Accuracy, zRT), mean)
+
+agg_pic_validRT$Subject <- as.factor(agg_pic_validRT$Subject)
+agg_pic_validRT$PictureType <- as.factor(agg_pic_validRT$PictureType)
+
+pic_RT_aov <- aov(zRT ~ PictureType + Error(Subject/PictureType), 
+                  data = agg_pic_validRT )
+summary(pic_RT_aov)
+
+pic_acc_aov <- aov(Accuracy ~ PictureType + Error(Subject/PictureType), 
+                   data = agg_pic_validRT)
+summary(pic_acc_aov)
+@
+
+\section {Plotting Accuracy and RT}
+\subsection *{Plotting Accuracy}
+<<>>=
+library(Rmisc)
+agg_pic_plot_rmisc = summarySE(new_pic_z_final, 
+                      measurevar = "Accuracy",
+                      groupvars = c("PictureType"))
+
+
+ggplot(agg_pic_plot_rmisc, aes(x = PictureType, y = Accuracy))+
+ geom_bar(stat = "identity", position = "dodge", width = 0.5, fill = "seagreen")+
+  geom_errorbar(aes(ymin = Accuracy - ci, ymax = Accuracy + ci),
+                width=.05, position=position_dodge(.5)) +
+  theme_few()+
+  xlab("Picture Type") + ylab("Mean Accuracy") + 
+  ggtitle("Effect of Picture Quality on Accuracy")
+
+@
+
+<<>>=
+agg_pic_validRT_plot_rmisc = summarySE(new_pic_z_final, 
+                      measurevar = "zRT",
+                      groupvars = c("PictureType"))
+
+ggplot(agg_pic_validRT_plot_rmisc, aes(x = PictureType, y = zRT))+
+ geom_bar(stat = "identity", position = "dodge", width = 0.5, fill = "seagreen")+
+  geom_errorbar(aes(ymin = zRT - ci, ymax = zRT + ci),
+                width=.05, position=position_dodge(.5)) +
+  theme_few()+
+  xlab("Picture Type") + ylab("Mean zRT") + 
+  ggtitle("Effect of Picture Quality on Reaction Times")
+@
+
+\section{Fetching AoA data and Merging}
+
+<<>>=
+AoA <- read.csv("AoA_51715_words.csv", header = TRUE, sep = ",")
+@
+
+<<>>=
+## we need ONLY correct trials for AoA analyses. 
+
+pic_z_correct = subset(new_pic_z_final, new_pic_z_final$Accuracy == '1')
+
+pic_withAoA_z = merge(pic_z_correct, AoA, by = "Object")
+pic_withAoA_z = pic_withAoA_z[, c(1:17, 27)]
+pic_withAoA_z = pic_withAoA_z[order(pic_withAoA_z$Subject),]
+@
+
+\section {Actual Plots}
+
+\subsection *{zRT and AoA}
+<<>>=
+
+ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim))+
+ geom_point(color = "red")+
+  geom_smooth(method = "lm", color = "purple")+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("z-RT") + 
+  ggtitle("z-scored Response Time as a\n function of Age of Acquisition")
+
+@
+\subsection* {Raw Plot by Picture Type}
+<<>>=
+ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim, 
+                          group = PictureType, color = PictureType))+
+ #geom_point(aes(color = PictureType))+
+  geom_smooth(method = "lm", se = FALSE)+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("z-RT") + 
+  ggtitle("RT as a function of AoA")
+@
+
+\section {Regressions}
+
+<<>>=
+library(lme4)
+library(lmerTest)
+
+m0 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem + 
+             (1|Subject))
+summary(m0)
+
+m1 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem*PictureType + 
+             (1|Subject))
+summary(m1)
+@
+
+\section {Plotting Model Fits}
+
+<<>>=
+fixed.frame <- 
+  data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5), 
+             PictureType = c("LineDrawing",
+                             "ColoredDrawing", "ColoredPhotograph"))) %>%
+  mutate(pred = predict(m1, newdata = ., re.form = NA))
+
+fixed.frame %>%
+  mutate(AoA = AoA_Kup_lem) %>%
+  ggplot(aes(x = AoA, y = pred, color = PictureType)) +
+    geom_line(size = 1) + 
+    xlab("Age of Acquition") + ylab ("ziRT")+ 
+  ggtitle("Model Fit: zRT by AoA And Picture Type")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+\section {Analysing Data Item-Wise}
+
+We need to eliminate items that are <0.40 accuracy in any of the 3 picture types :
+<<>>=
+
+item_acc = group_by(new_pic_z_final, Object, PictureType )%>%
+    summarise_each(funs(mean(., na.rm = TRUE)), Accuracy)
+## so now we find the items with low accuracy 
+low_acc_items = subset(item_acc, item_acc$Accuracy < 0.40)
+low_acc_items_list = unique(low_acc_items$Object)
+
+## now we must eliminate these items from the new_pic_z_final file and re-run all regressions
+
+pic_z_itemsremoved = subset(new_pic_z_final, ! (new_pic_z_final$Object %in% low_acc_items_list))
+
+## now we use this dataset to re-do our AoA analyses: so we first merge this with the AoA file
+
+item_withAoA_complete = merge(pic_z_itemsremoved, AoA, by = "Object")
+item_withAoA_complete = item_withAoA_complete[order(item_withAoA_complete$Subject),]
+@
+
+\section {Removing Low-Accuracy items: Regressions}
+
+<<>>=
+library(lme4)
+library(lmerTest)
+
+m2 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem + 
+            (1|Subject))
+summary(m2)
+
+m3 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem*PictureType + 
+            (1|Subject))
+summary(m3)
+
+@
+
+We also plot the curve again, to see if it's any different:
+
+<<>>=
+
+ggplot(item_withAoA_complete, aes(x = AoA_Kup_lem, y = zRT, 
+                                  group = PictureType, color = PictureType))+
+ #geom_point(aes(color = PictureType))+
+  geom_smooth(method = "lm", se = FALSE)+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("z-RT") + 
+  ggtitle("RT as a function of AoA")
+
+ggplot(item_withAoA_complete, aes(x = AoA, y = zRT))+
+ geom_point(color = "red")+
+  geom_smooth(method = "lm", color = "purple")+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("z-RT") + 
+  ggtitle("z-RT as a function of AoA")
+
+@
+
+\end{document}
