@@ -274,7 +274,7 @@ fixed.frame %>%
   mutate(AoA = AoA_Kup_lem) %>%
   ggplot(aes(x = AoA, y = pred, color = PictureType)) +
     geom_line(size = 1) + 
-    xlab("Age of Acquition") + ylab ("ziRT")+ 
+    xlab("Age of Acquition") + ylab ("z-RT")+ 
   ggtitle("Model Fit: zRT by AoA And Picture Type")+
 theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
@@ -282,13 +282,13 @@ theme_classic() +
           legend.title = element_text(face = "bold", size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
+
 \section {Analysing Data Item-Wise}
 
 We need to eliminate items that are <0.40 accuracy in any of the 3 picture types :
 <<>>=
-
 item_acc = group_by(new_pic_z_final, Object, PictureType )%>%
-    summarise_each(funs(mean(., na.rm = TRUE)), Accuracy)
+    summarise_at(vars(Accuracy))
 ## so now we find the items with low accuracy 
 low_acc_items = subset(item_acc, item_acc$Accuracy < 0.40)
 low_acc_items_list = unique(low_acc_items$Object)
@@ -322,22 +322,23 @@ summary(m3)
 We also plot the curve again, to see if it's any different:
 
 <<>>=
+fixed.frame.2 <- 
+  data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5), 
+             PictureType = c("LineDrawing",
+                             "ColoredDrawing", "ColoredPhotograph"))) %>%
+  mutate(pred = predict(m3, newdata = ., re.form = NA))
 
-ggplot(item_withAoA_complete, aes(x = AoA_Kup_lem, y = zRT, 
-                                  group = PictureType, color = PictureType))+
- #geom_point(aes(color = PictureType))+
-  geom_smooth(method = "lm", se = FALSE)+
- theme_few()+
-  xlab("Age of Acquisition") + ylab("z-RT") + 
-  ggtitle("RT as a function of AoA")
-
-ggplot(item_withAoA_complete, aes(x = AoA, y = zRT))+
- geom_point(color = "red")+
-  geom_smooth(method = "lm", color = "purple")+
- theme_few()+
-  xlab("Age of Acquisition") + ylab("z-RT") + 
-  ggtitle("z-RT as a function of AoA")
-
+fixed.frame.2 %>%
+  mutate(AoA = AoA_Kup_lem) %>%
+  ggplot(aes(x = AoA, y = pred, color = PictureType)) +
+    geom_line(size = 1) + 
+    xlab("Age of Acquition") + ylab ("z-RT")+ 
+  ggtitle("Model Fit: zRT by AoA And Picture Type")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 
 \end{document}
