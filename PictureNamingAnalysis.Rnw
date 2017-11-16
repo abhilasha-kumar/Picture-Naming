@@ -19,9 +19,6 @@ library(tidyr)
 library(sjPlot)
 @
 
-<<>>=
-sjp.setTheme(base = theme_few())
-@
 \begin{document}
 \SweaveOpts{concordance=TRUE}
  \maketitle
@@ -31,10 +28,11 @@ sjp.setTheme(base = theme_few())
 <<>>=
 pic = read.csv("Compiled_FINAL_CSV.csv", header = TRUE, sep = ",")
 pic_mainvariables = pic[, c(2,3,22,26,28,31,33,37,38,39, 8)]
-colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object", "PictureType", "RT", "ObjectNo", "Name", "InvalidTrial", "Accuracy", "ItemCount")
-
-pic_mainvariables_valid = subset(pic_mainvariables, pic_mainvariables$InvalidTrial == "0")
-
+colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object",
+                "PictureType", "RT", "ObjectNo", "Name", "InvalidTrial",
+                "Accuracy", "ItemCount")
+pic_mainvariables_valid = subset(pic_mainvariables, 
+                                 pic_mainvariables$InvalidTrial == "0")
 @
 
 \section{Making the z-scores}
@@ -66,13 +64,13 @@ pic_z = pic_z %>% mutate(zRT = (RT - MeanRT)/sdRT)
 sub_pic = group_by(pic_z, Subject) %>%
   summarise_at(vars(zRT), mean)
 
-write.csv(pic_z, file="pic_z.csv")
+#write.csv(pic_z, file="pic_z.csv")
 @
 
 
 \section {Histograms for raw and z-RT}
 \subsection *{Raw RT}
-<<>>=
+<<fig=TRUE>>=
 library(ggplot2)
 library(ggthemes)
 ggplot(pic_mainvariables_valid, aes(x = RT))+
@@ -82,7 +80,7 @@ geom_histogram(binwidth = 200, color = "gray4", fill = "goldenrod1")+
   ggtitle("Raw RT Histogram for Valid Trials")
 @
 \subsection *{z RT}
-<<>>=
+<<fig=TRUE>>=
 ggplot(pic_z, aes(x = zRT))+
 geom_histogram(binwidth = 0.5, color = "gray4", fill = "goldenrod1")+
     theme_few()+
@@ -91,7 +89,7 @@ geom_histogram(binwidth = 0.5, color = "gray4", fill = "goldenrod1")+
 @
 
 \subsection *{Trimming zRT}
-<<>>=
+<<fig=TRUE>>=
 ## trimming above and below 3 s.d. 
 pic_z_trimmed = subset(pic_z, pic_z$zRT < 3 & pic_z$zRT > -3)
 
@@ -189,7 +187,6 @@ ggplot(agg_pic_plot_rmisc, aes(x = PictureType, y = Accuracy))+
   theme_few()+
   xlab("Picture Type") + ylab("Mean Accuracy") + 
   ggtitle("Effect of Picture Quality on Accuracy")
-
 @
 
 <<>>=
@@ -214,9 +211,7 @@ AoA <- read.csv("AoA_51715_words.csv", header = TRUE, sep = ",")
 
 <<>>=
 ## we need ONLY correct trials for AoA analyses. 
-
 pic_z_correct = subset(new_pic_z_final, new_pic_z_final$Accuracy == '1')
-
 pic_withAoA_z = merge(pic_z_correct, AoA, by = "Object")
 pic_withAoA_z = pic_withAoA_z[, c(1:17, 27)]
 pic_withAoA_z = pic_withAoA_z[order(pic_withAoA_z$Subject),]
@@ -225,18 +220,16 @@ pic_withAoA_z = pic_withAoA_z[order(pic_withAoA_z$Subject),]
 \section {Actual Plots}
 
 \subsection *{zRT and AoA}
-<<>>=
-
+<<fig=TRUE>>=
 ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim))+
  geom_point(color = "red")+
   geom_smooth(method = "lm", color = "purple")+
  theme_few()+
   xlab("Age of Acquisition") + ylab("z-RT") + 
   ggtitle("z-scored Response Time as a\n function of Age of Acquisition")
-
 @
 \subsection* {Raw Plot by Picture Type}
-<<>>=
+<<fig=TRUE>>=
 ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim, 
                           group = PictureType, color = PictureType))+
  #geom_point(aes(color = PictureType))+
@@ -250,8 +243,6 @@ ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim,
 
 <<>>=
 library(lme4)
-library(lmerTest)
-
 m0 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem + 
              (1|Subject))
 summary(m0)
@@ -263,7 +254,7 @@ summary(m1)
 
 \section {Plotting Model Fits}
 
-<<>>=
+<<fig=TRUE>>=
 fixed.frame <- 
   data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5), 
              PictureType = c("LineDrawing",
@@ -288,7 +279,7 @@ theme_classic() +
 We need to eliminate items that are <0.40 accuracy in any of the 3 picture types :
 <<>>=
 item_acc = group_by(new_pic_z_final, Object, PictureType )%>%
-    summarise_at(vars(Accuracy))
+    summarise_at(vars(Accuracy), mean)
 ## so now we find the items with low accuracy 
 low_acc_items = subset(item_acc, item_acc$Accuracy < 0.40)
 low_acc_items_list = unique(low_acc_items$Object)
@@ -307,7 +298,6 @@ item_withAoA_complete = item_withAoA_complete[order(item_withAoA_complete$Subjec
 
 <<>>=
 library(lme4)
-library(lmerTest)
 
 m2 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem + 
             (1|Subject))
@@ -316,12 +306,11 @@ summary(m2)
 m3 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem*PictureType + 
             (1|Subject))
 summary(m3)
-
 @
-
+\subsection *{Modified Plot}
 We also plot the curve again, to see if it's any different:
 
-<<>>=
+<<fig=TRUE>>=
 fixed.frame.2 <- 
   data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5), 
              PictureType = c("LineDrawing",
@@ -332,13 +321,13 @@ fixed.frame.2 %>%
   mutate(AoA = AoA_Kup_lem) %>%
   ggplot(aes(x = AoA, y = pred, color = PictureType)) +
     geom_line(size = 1) + 
-    xlab("Age of Acquition") + ylab ("z-RT")+ 
+    xlab("Age of Acquisition") + ylab ("z-RT")+ 
   ggtitle("Model Fit: zRT by AoA And Picture Type")+
 theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
           legend.title = element_text(face = "bold", size = rel(1.2)),
-          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
 @
 
 \end{document}
