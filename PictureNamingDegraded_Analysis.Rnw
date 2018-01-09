@@ -239,15 +239,17 @@ ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim,
 <<>>=
 library(lme4)
 m0 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem + 
-             (1|Subject))
+             (1|Subject) + (1|Trial) + (1|ObjectNo))
 summary(m0)
 
 m1 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem*PictureType + 
-             (1|Subject))
+             (1|Subject)+ (1|Trial) + (1|ObjectNo))
 summary(m1)
 @
 
 \section {Plotting Model Fits}
+
+\subsection *{AOA and Picture Type}
 
 <<fig=TRUE>>=
 fixed.frame <- 
@@ -259,8 +261,28 @@ fixed.frame %>%
   mutate(AoA = AoA_Kup_lem) %>%
   ggplot(aes(x = AoA, y = pred, color = PictureType)) +
     geom_line(size = 1) + 
-    xlab("Age of Acquition") + ylab ("z-RT")+ 
+    xlab("Age of Acquisition") + ylab ("z-RT")+ 
   ggtitle("Model Fit: zRT by AoA And Picture Type")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+\subsection *{AOA Only}
+
+<<fig=TRUE>>=
+fixed.frame <- 
+  data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5))) %>%
+  mutate(pred = predict(m0, newdata = ., re.form = NA))
+
+fixed.frame %>%
+  mutate(AoA = AoA_Kup_lem) %>%
+  ggplot(aes(x = AoA, y = pred)) +
+      geom_line(size = 1, color = "purple") + 
+    xlab("Age of Acquisition") + ylab ("z-RT")+ 
+  ggtitle("Model Fit: zRT by AoA")+
 theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
@@ -273,7 +295,7 @@ theme_classic() +
 We need to eliminate items that are <0.40 accuracy in any of the 3 picture types :
 <<>>=
 item_acc = group_by(new_pic_z_final, Object, PictureType )%>%
-    summarise_at(vars(Accuracy), mean)
+    summarise_at(vars(Accuracy, zRT_trim), mean)
 ## so now we find the items with low accuracy 
 low_acc_items = subset(item_acc, item_acc$Accuracy < 0.40)
 low_acc_items_list = unique(low_acc_items$Object)
@@ -294,11 +316,11 @@ item_withAoA_complete = item_withAoA_complete[order(item_withAoA_complete$Subjec
 library(lme4)
 
 m2 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem + 
-            (1|Subject))
+            (1|Subject) + (1|Trial) + (1|Object))
 summary(m2)
 
 m3 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem*PictureType + 
-            (1|Subject))
+            (1|Subject) + (1|Trial) + (1|Object))
 summary(m3)
 @
 \subsection *{Modified Plot}
@@ -315,12 +337,115 @@ fixed.frame.2 %>%
   ggplot(aes(x = AoA, y = pred, color = PictureType)) +
     geom_line(size = 1) + 
     xlab("Age of Acquisition") + ylab ("z-RT")+ 
-  ggtitle("Model Fit: zRT by AoA And Picture Type")+
+  ggtitle("Model Fit: zRT by AoA And Picture Type \n After removing 6 low-accuracy items ")+
 theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
           legend.title = element_text(face = "bold", size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
 @
+
+\section {Brinley Plot}
+
+<<>>=
+#item_acc contains zRT for degraded and full pictures for each item
+
+item_brinley = item_acc[,c(1,2,4)]
+library(tidyr)
+wide_item = item_brinley %>%
+  spread(PictureType, zRT_trim)
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(wide_item, aes(x = FullPicture, y = DegradedPicture, label = Object)) +
+    geom_point(color = "red")+
+    geom_smooth(method = "loess")+
+        geom_text(aes(label=Object, vjust = 1, hjust = 1))+
+    geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Clear Mean") + ylab ("Degraded Mean")+ 
+  ggtitle("Brinley Plot")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+
+\section *{Frequency Decile Brinley Plot}
+
+<<>>=
+item_elp = read.csv("DegradedItems_ELP.csv", header = TRUE, sep = ",")  
+
+item_elp_brinley = merge(item_elp, item_brinley, by  = c("Object"))    
+# 398 rows: dropped wheelbarrow
+ 
+item_elp_brinley$Decile = ntile(item_elp_brinley$Log_Freq_HAL, 10)
+
+elp_decile_data = group_by(item_elp_brinley, Decile, PictureType) %>%
+  summarize_at(vars(zRT_trim), mean)
+library(tidyr)
+elp_decile_wide = elp_decile_data %>%
+  spread(PictureType, zRT_trim)  
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(decile_wide, aes(x = FullPicture, y = DegradedPicture)) +
+    geom_point(color = "red")+
+                geom_text(aes(label=Decile, vjust = 1, hjust = 1))+
+    geom_smooth(method = "lm")+
+    geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Clear Mean") + ylab ("Degraded Mean")+ 
+    xlim(-0.5,0.5)+
+  ggtitle("Brinley Plot For Frequency Deciles")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+
+\section *{H-Statistic Decile Brinley Plot}
+
+<<>>=
+marcnorms = read.csv("590MarcNorms.csv", header = TRUE, sep = ",")
+  ## lower H statistic means greater name agreement. So we reverse code
+  marcnorms$NameAgreement = 3.19 - marcnorms$H.statistic
+  # Thus, higher NameAgreement, means higher name agreement
+
+item_marc_brinley = merge(marcnorms, item_brinley, by  = c("Object"))    
+# 390 rows: dropped castle, pillow, radio, shower, tank: used anti_join
+ 
+item_marc_brinley$Decile = ntile(item_marc_brinley$NameAgreement, 10)
+
+marc_decile_data = group_by(item_marc_brinley, Decile, PictureType) %>%
+  summarize_at(vars(zRT_trim), mean)
+library(tidyr)
+marc_decile_wide = marc_decile_data %>%
+  spread(PictureType, zRT_trim)  
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(marc_decile_data, aes(x = Decile, y = zRT_trim, 
+                               color = PictureType, group = PictureType)) +
+    geom_point(color = "red")+
+    geom_smooth(method = "lm")+
+           geom_text(aes(label=Decile, vjust = 1, hjust = 1))+
+   # geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Decile") + ylab ("zRT")+ 
+  #  xlim(-0.6,0.5)+
+  ggtitle("Brinley Plot For Name Agreement Deciles")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+  
 
 \end{document}
