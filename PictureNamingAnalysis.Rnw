@@ -26,7 +26,7 @@ library(sjPlot)
 \section{Reading File}
 
 <<>>=
-pic = read.csv("Compiled_FINAL_CSV.csv", header = TRUE, sep = ",")
+pic = read.csv("CompiledPictureType_FINAL_CSV.csv", header = TRUE, sep = ",")
 pic_mainvariables = pic[, c(2,3,22,26,28,31,33,37,38,39, 8)]
 colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object",
                 "PictureType", "RT", "ObjectNo", "Name", "InvalidTrial",
@@ -244,11 +244,11 @@ ggplot(pic_withAoA_z, aes(x = AoA_Kup_lem, y = zRT_trim,
 <<>>=
 library(lme4)
 m0 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem + 
-             (1|Subject))
+             (1|Subject) + (1|Trial) + (1|ObjectNo))
 summary(m0)
 
 m1 = lmer (data = pic_withAoA_z, zRT_trim ~ AoA_Kup_lem*PictureType + 
-             (1|Subject))
+             (1|Subject)+ (1|Trial) + (1|ObjectNo))
 summary(m1)
 @
 
@@ -300,11 +300,11 @@ item_withAoA_complete = item_withAoA_complete[order(item_withAoA_complete$Subjec
 library(lme4)
 
 m2 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem + 
-            (1|Subject))
+            (1|Subject)+ (1|Trial) + (1|ObjectNo))
 summary(m2)
 
 m3 = lmer(data = item_withAoA_complete, zRT ~ AoA_Kup_lem*PictureType + 
-            (1|Subject))
+            (1|Subject)+ (1|Trial) + (1|ObjectNo))
 summary(m3)
 @
 \subsection *{Modified Plot}
@@ -322,7 +322,7 @@ fixed.frame.2 %>%
   ggplot(aes(x = AoA, y = pred, color = PictureType)) +
     geom_line(size = 1) + 
     xlab("Age of Acquisition") + ylab ("z-RT")+ 
-  ggtitle("Model Fit: zRT by AoA And Picture Type")+
+  ggtitle("Model Fit: zRT by AoA And Picture Type\n After removing 23 low-accuracy items")+
 theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
