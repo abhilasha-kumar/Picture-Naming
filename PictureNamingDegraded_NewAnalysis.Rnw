@@ -1,0 +1,797 @@
+\documentclass[letterpaper]{article}
+\usepackage[a4paper, total={7in, 8in}]{geometry}
+
+\usepackage{xcolor}
+\usepackage{Sweavel}
+\usepackage{graphicx}
+\def\Sweavesize{\normalsize}
+% Uncomment some of the following to use some alternatives:
+\def\Rcolor{\color{black}}
+\def\Routcolor{\color{blue}}
+\def\Rcommentcolor{\color{blue}}
+\definecolor{babyblueeyes}{rgb}{0.74, 0.83, 0.95}
+
+% To change background color or R code and/or output, use e.g.:
+\def\Rbackground{\color{babyblueeyes}}
+\def\Routbackground{\color[gray]{.8}}
+
+% To use rgb specifications use \color[rgb]{ , , }
+% To use gray scale use e.g. \color[gray]{0.5}
+% If you change any of these after the first chunk is produced, the
+% changes will have effect only for the next chunk.
+
+\title{Picture Naming Analysis}
+\author{Abhilasha Kumar}
+
+\begin{document}
+\SweaveOpts{concordance=FALSE}
+
+ \maketitle
+
+\section{Reading the Data File}
+
+\section{Reading File}
+
+<<>>=
+pic = read.csv("CompiledPictureNaming_Degraded.csv", header = TRUE, sep = ",")
+pic_mainvariables = pic[, c(2,3,22,26,28,31,33,36,37,38)]
+colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object",
+                "PictureType", "RT", "ObjectNo",  "Accuracy",
+                "InvalidTrial", "ItemCount")
+
+@
+
+\section {Excluding Subjects}
+
+<<>>=
+## we exclude some subjects from all further RT analyses here
+library(dplyr)
+numitems = group_by(pic_mainvariables, Subject, ItemCount)%>%
+    summarise(count = n())
+## each subject has 201 items: see how many in each condition
+
+numitems_sub_type = group_by(pic_mainvariables, Subject, PictureType, ItemCount)%>%
+    summarise(count = n())
+
+agg_sub = group_by(pic_mainvariables, Subject)%>%
+    summarise_at(vars(Accuracy), mean)
+#which(agg_sub$Accuracy < 0.51) -- no subject scored less than 50%
+@
+
+\section {Separating Intact and Degaraded}
+
+<<>>=
+#separating out full and degraded trials
+
+pic_intact_orig = pic_mainvariables %>% filter(PictureType == "FullPicture")
+pic_degraded_orig = pic_mainvariables %>% filter(PictureType == "DegradedPicture")
+
+## removing error trials separately for intact and degraded
+pic_intact = pic_intact_orig %>% filter(InvalidTrial == "0" & 
+                                   Accuracy == "1")
+## removes 14.6% trials
+pic_degraded = pic_degraded_orig %>% filter(InvalidTrial == "0" & 
+                                   Accuracy == "1")
+## removes 16.07% trials
+@
+
+\section{Making the z-scores}
+
+<<>>=
+library(dplyr)
+pic_firsttrim_intact = pic_intact %>% filter( RT > 250 & RT < 5000)
+# removes 0.24% trials
+pic_firsttrim_degraded = pic_degraded %>% filter( RT > 250 & RT < 5000)
+# removes 0.49% trials
+@
+\subsection *{For Intact}
+
+<<>>=
+### FOR INTACT PICTURES
+## aggregate per subject all IVs and DVs
+meanRT_intact = group_by(pic_firsttrim_intact, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_intact) = c("Subject", "MeanRT")
+
+sdRT_intact = group_by(pic_firsttrim_intact, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_intact) = c("Subject", "sdRT")
+
+RT_agg = merge(meanRT_intact, sdRT_intact, by = "Subject")
+
+## merge aggregate info with long data
+pic_z_intact = merge(pic_firsttrim_intact, RT_agg, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+pic_z_intact = pic_z_intact %>% mutate(zRT = (RT - MeanRT)/sdRT)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(pic_z_intact, Subject) %>%
+  summarise_at(vars(zRT), mean)
+
+#write.csv(pic_z, file="pic_z.csv")
+@
+
+\subsection *{For Degraded}
+
+<<>>=
+### FOR DEGRADED PICTURES
+## aggregate per subject all IVs and DVs
+meanRT_degraded = group_by(pic_firsttrim_degraded, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_degraded) = c("Subject", "MeanRT")
+
+sdRT_degraded = group_by(pic_firsttrim_degraded, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_degraded) = c("Subject", "sdRT")
+
+RT_agg = merge(meanRT_degraded, sdRT_degraded, by = "Subject")
+
+## merge aggregate info with long data
+pic_z_degraded = merge(pic_firsttrim_degraded, RT_agg, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+pic_z_degraded = pic_z_degraded %>% mutate(zRT = (RT - MeanRT)/sdRT)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(pic_z_degraded, Subject) %>%
+  summarise_at(vars(zRT), mean)
+
+#write.csv(pic_z, file="pic_z.csv")
+@
+
+\section {Histograms for raw and z-RT}
+\subsection *{Raw RT}
+<<fig=TRUE>>=
+library(ggplot2)
+library(ggthemes)
+ggplot(pic_degraded_orig, aes(x = RT))+
+geom_histogram(binwidth = 200, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("Raw RT Histogram for All Trials")
+@
+\subsection *{z RT}
+\subsubsection *{Intact}
+<<fig=TRUE>>=
+ggplot(pic_z_intact, aes(x = zRT))+
+geom_histogram(binwidth = 0.5, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlim(-2.5,7.5)+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("z-RT Intact Histogram for above 250 ms & <5s Trials")
+@
+
+\subsubsection *{Degraded}
+<<fig=TRUE>>=
+ggplot(pic_z_degraded, aes(x = zRT))+
+geom_histogram(binwidth = 0.5, color = "gray4", fill = "goldenrod1")+
+    theme_few()+
+  xlim(-2.5,7.5)+
+  xlab("Raw RT") + ylab("Count") + 
+  ggtitle("z-RT Degraded Histogram for above 250 ms & <5s Trials")
+@
+
+\subsection *{Trimming zRT}
+<<>>=
+## trimming above and below 3 s.d. 
+pic_intact_trimmed = pic_z_intact %>% filter(zRT < 3 & zRT > -3)
+pic_degraded_trimmed = pic_z_degraded %>% filter(zRT < 3 & zRT > -3)
+@
+
+\section {Repeat z-scoring after trimming}
+\subsection {For Intact}
+<<>>=
+library(dplyr)
+
+## aggregate per subject all IVs and DVs
+meanRT_trim_intact = group_by(pic_intact_trimmed, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_trim_intact) = c("Subject", "MeanRT_trim")
+
+sdRT_trim_intact = group_by(pic_intact_trimmed, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_trim_intact) = c("Subject", "sdRT_trim")
+
+RT_agg_trim = merge(meanRT_trim_intact, sdRT_trim_intact, by = "Subject")
+
+## merge aggregate info with long data
+new_intact_z = merge(pic_intact_trimmed, RT_agg_trim, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+new_intact_z = new_intact_z %>% mutate(zRT_trim = (RT - MeanRT_trim)/sdRT_trim)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(new_intact_z, Subject) %>%
+  summarise_at(vars(zRT_trim), mean)
+
+#write.csv(new_intact_z, file="final_pic_z.csv")
+@
+
+\subsection {For Degraded}
+<<>>=
+library(dplyr)
+
+## aggregate per subject all IVs and DVs
+meanRT_trim_degraded = group_by(pic_degraded_trimmed, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_trim_degraded) = c("Subject", "MeanRT_trim")
+
+sdRT_trim_degraded = group_by(pic_degraded_trimmed, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_trim_degraded) = c("Subject", "sdRT_trim")
+
+RT_agg_trim = merge(meanRT_trim_degraded, sdRT_trim_degraded, by = "Subject")
+
+## merge aggregate info with long data
+new_degraded_z = merge(pic_degraded_trimmed, RT_agg_trim, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+new_degraded_z = new_degraded_z %>% 
+    mutate(zRT_trim = (RT - MeanRT_trim)/sdRT_trim)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(new_degraded_z, Subject) %>%
+  summarise_at(vars(zRT_trim), mean)
+
+#write.csv(new_intact_z, file="final_pic_z.csv")
+@
+
+\section {Combining Separate z}
+
+<<>>=
+main_intact = new_intact_z[,c(1,3,4,5,6,7,8,16)]
+  
+main_degraded = new_degraded_z[,c(1,3, 4,5, 6,7,8,16)]   
+  final_pic_z = rbind(main_intact, main_degraded)
+final_pic_z = final_pic_z[order(final_pic_z$Subject),]
+@
+
+\section {z-Scoring a different way}
+
+<<>>=
+pic_valid = pic_mainvariables %>% filter(InvalidTrial == "0" & 
+                                   Accuracy == "1")
+pic_firsttrim = pic_valid %>% filter( RT > 250 & RT < 5000)
+
+meanRT = group_by(pic_firsttrim, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT) = c("Subject", "MeanRT")
+
+sdRT = group_by(pic_firsttrim, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT) = c("Subject", "sdRT")
+
+RT_agg = merge(meanRT, sdRT, by = "Subject")
+
+## merge aggregate info with long data
+pic_z = merge(pic_firsttrim, RT_agg, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+pic_z = pic_z %>% mutate(zRT = (RT - MeanRT)/sdRT)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(pic_z, Subject) %>%
+  summarise_at(vars(zRT), mean)
+
+pic_trimmed = pic_z %>% filter(zRT < 3 & zRT > -3)
+
+#### REPEATING Z SCORING ########
+
+## aggregate per subject all IVs and DVs
+meanRT_trim = group_by(pic_trimmed, Subject) %>%
+  summarise_at(vars(RT), mean)
+colnames(meanRT_trim) = c("Subject", "MeanRT_trim")
+
+sdRT_trim = group_by(pic_trimmed, Subject) %>%
+  summarise_at(vars(RT), sd)
+colnames(sdRT_trim) = c("Subject", "sdRT_trim")
+
+RT_agg_trim = merge(meanRT_trim, sdRT_trim, by = "Subject")
+
+## merge aggregate info with long data
+new_z = merge(pic_trimmed, RT_agg_trim, by = "Subject", all.x = T)
+
+## person and grand-mean centered scores using original and aggregate
+library(dplyr)
+new_z = new_z %>% mutate(zRT_trim = (RT - MeanRT_trim)/sdRT_trim)
+                 
+## checking: subject level means should be zero
+
+sub_pic = group_by(new_z, Subject) %>%
+  summarise_at(vars(zRT_trim), mean)
+@
+
+
+\section {Aggregating RTs and Accuracy}
+<<>>=
+library(dplyr)
+
+agg_pic_validRT = group_by(new_z, Subject, PictureType)%>%
+    summarise_at(vars(Accuracy, zRT), mean)
+
+agg_pic_validRT$Subject <- as.factor(agg_pic_validRT$Subject)
+agg_pic_validRT$PictureType <- as.factor(agg_pic_validRT$PictureType)
+
+pic_RT_aov <- aov(zRT ~ PictureType + Error(Subject/PictureType), 
+                  data = agg_pic_validRT )
+summary(pic_RT_aov)
+
+pic_acc_aov <- aov(Accuracy ~ PictureType + Error(Subject/PictureType), 
+                   data = agg_pic_validRT)
+summary(pic_acc_aov)
+@
+
+\section {Plotting Accuracy and RT}
+\subsection *{Plotting Accuracy}
+<<fig=TRUE>>=
+library(Rmisc)
+agg_pic_plot_rmisc = summarySE(new_z, 
+                      measurevar = "Accuracy",
+                      groupvars = c("PictureType"))
+
+
+ggplot(agg_pic_plot_rmisc, aes(x = PictureType, y = Accuracy))+
+ geom_bar(stat = "identity", position = "dodge", width = 0.5, fill = "seagreen")+
+  geom_errorbar(aes(ymin = Accuracy - ci, ymax = Accuracy + ci),
+                width=.05, position=position_dodge(.5)) +
+  theme_few()+
+  xlab("Picture Type") + ylab("Mean Accuracy") + 
+  ggtitle("Effect of Picture Quality on Accuracy")
+@
+
+<<fig=TRUE>>=
+agg_pic_validRT_plot_rmisc = summarySE(new_z, 
+                      measurevar = "zRT",
+                      groupvars = c("PictureType"))
+
+ggplot(agg_pic_validRT_plot_rmisc, aes(x = PictureType, y = zRT))+
+ geom_bar(stat = "identity", position = "dodge", width = 0.5, fill = "seagreen")+
+  geom_errorbar(aes(ymin = zRT - ci, ymax = zRT + ci),
+                width=.05, position=position_dodge(.5)) +
+  theme_few()+
+  xlab("Picture Type") + ylab("Mean zRT") + 
+  ggtitle("Effect of Picture Quality on Reaction Times")
+@
+
+\section{Fetching AoA data and Merging}
+
+<<>>=
+AoA <- read.csv("AoA_51715_words.csv", header = TRUE, sep = ",")
+@
+
+<<>>=
+
+### final_pic_z combines z-scores from separately z-scored intact and degraded
+pic_withAoA_z = merge(final_pic_z, AoA, by = "Object")
+pic_withAoA_z = pic_withAoA_z[, c(1:8, 18)]
+pic_withAoA_z = pic_withAoA_z[order(pic_withAoA_z$Subject),]
+
+### ALSO MERGING WITH THE COMBINED Z SCORING DATA SET : new_z
+
+new_z_AoA = merge(new_z, AoA, by = "Object")
+new_z_AoA = new_z_AoA[, c(1:17, 26)]
+new_z_AoA = new_z_AoA[order(new_z_AoA$Subject),]
+@
+
+\section {Actual Plots}
+
+\subsection *{zRT and AoA}
+<<fig=TRUE>>=
+ggplot(new_z_AoA, aes(x = AoA_Kup_lem, y = zRT_trim))+
+ geom_point(color = "red")+
+  geom_smooth(method = "lm", color = "purple")+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("z-RT") + 
+  ggtitle("z-scored Response Time as a\n function of Age of Acquisition")
+@
+\subsection* {Raw Plot by Picture Type}
+<<fig=TRUE>>=
+ggplot(new_z_AoA, aes(x = AoA_Kup_lem, y = RT, 
+                          group = PictureType, color = PictureType))+
+ #geom_point(aes(color = PictureType))+
+  geom_smooth(method = "lm", se = FALSE)+
+ theme_few()+
+  xlab("Age of Acquisition") + ylab("Raw RT") + 
+  ggtitle("RT as a function of AoA")
+@
+
+\section {Regressions}
+
+<<>>=
+library(lme4)
+m0 = lmer (data = new_z_AoA, zRT_trim ~ AoA_Kup_lem + 
+             (1|Subject) + (1|Trial) + (1|ObjectNo))
+summary(m0)
+
+m1 = lmer (data = new_z_AoA, RT ~ AoA_Kup_lem*PictureType + 
+             (1|Subject)+ (1|Trial) + (1|ObjectNo))
+summary(m1)
+@
+
+\section {Plotting Model Fits}
+
+\subsection *{AOA and Picture Type}
+
+<<fig=TRUE>>=
+fixed.frame <- 
+  data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5), 
+             PictureType = c("FullPicture","DegradedPicture"))) %>%
+  mutate(pred = predict(m1, newdata = ., re.form = NA))
+
+fixed.frame %>%
+  mutate(AoA = AoA_Kup_lem) %>%
+  ggplot(aes(x = AoA, y = pred, color = PictureType)) +
+    geom_line(size = 1) + 
+    xlab("Age of Acquisition") + ylab ("z-RT")+ 
+  ggtitle("Model Fit: zRT by AoA And Picture Type")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+\subsection *{AOA Only}
+
+<<fig=TRUE>>=
+fixed.frame <- 
+  data.frame(expand.grid(AoA_Kup_lem = seq(1,10,0.5))) %>%
+  mutate(pred = predict(m0, newdata = ., re.form = NA))
+
+fixed.frame %>%
+  mutate(AoA = AoA_Kup_lem) %>%
+  ggplot(aes(x = AoA, y = pred)) +
+      geom_line(size = 1, color = "purple") + 
+    xlab("Age of Acquisition") + ylab ("z-RT")+ 
+  ggtitle("Model Fit: zRT by AoA")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+\section {Brinley Plot}
+
+<<fig=TRUE>>=
+#item_acc contains zRT for degraded and full pictures for each item
+item_brinley = group_by(final_pic_z, Object, PictureType )%>%
+    summarise_at(vars( zRT_trim), mean)
+
+library(tidyr)
+wide_item = item_brinley %>%
+  spread(PictureType, zRT_trim)
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(wide_item, aes(x = FullPicture, y = DegradedPicture, label = Object)) +
+    geom_point(color = "red")+
+    geom_smooth(method = "loess")+
+        geom_text(aes(label=Object, vjust = 1, hjust = 1))+
+    geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Clear Mean") + ylab ("Degraded Mean")+ 
+  ggtitle("Brinley Plot")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+
+\section *{Frequency Decile Brinley Plot}
+
+<<fig=TRUE>>=
+item_elp = read.csv("DegradedItems_ELP.csv", header = TRUE, sep = ",")  
+
+item_elp_brinley = merge(item_elp, item_brinley, by  = c("Object"))    
+# 398 rows: dropped wheelbarrow
+ 
+item_elp_brinley$Decile = ntile(item_elp_brinley$Log_Freq_HAL, 10)
+
+elp_decile_data = group_by(item_elp_brinley, Decile, PictureType) %>%
+  summarize_at(vars(zRT_trim), mean)
+library(tidyr)
+elp_decile_wide = elp_decile_data %>%
+  spread(PictureType, zRT_trim)  
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(elp_decile_wide, aes(x = FullPicture, y = DegradedPicture)) +
+    geom_point(color = "red")+
+                geom_text(aes(label=Decile, vjust = 1, hjust = 1))+
+    geom_smooth(method = "lm")+
+    geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Clear Mean") + ylab ("Degraded Mean")+ 
+ #   xlim(-0.5,0.5)+
+  ggtitle("Brinley Plot For Frequency Deciles")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+
+\section *{H-Statistic Decile Brinley Plot}
+
+<<fig=TRUE>>=
+marcnorms = read.csv("590MarcNorms.csv", header = TRUE, sep = ",")
+  ## lower H statistic means greater name agreement. So we reverse code
+  marcnorms$NameAgreement = 3.19 - marcnorms$H.statistic
+  # Thus, higher NameAgreement, means higher name agreement
+
+item_marc_brinley = merge(marcnorms, item_brinley, by  = c("Object"))    
+# 390 rows: dropped castle, pillow, radio, shower, tank: used anti_join
+ 
+item_marc_brinley$Decile = ntile(item_marc_brinley$NameAgreement, 10)
+
+marc_decile_data = group_by(item_marc_brinley, Decile, PictureType) %>%
+  summarize_at(vars(zRT_trim), mean)
+library(tidyr)
+marc_decile_wide = marc_decile_data %>%
+  spread(PictureType, zRT_trim)  
+
+# Now, we plot these in a brinley plot
+library(ggplot2)
+library(ggthemes)
+  ggplot(marc_decile_data, aes(x = Decile, y = zRT_trim,
+                               group = PictureType, color = PictureType)) +
+    geom_point(color = "red")+
+    geom_smooth(method = "lm")+
+           geom_text(aes(label=Decile, vjust = 1, hjust = 1))+
+    geom_abline(slope = 1, intercept = 0, color = "red")+
+    xlab("Name Decile (1-10)") + ylab ("zRT")+ 
+   # xlim(-0.6,0.5)+
+  ggtitle("Brinley Plot For Name Agreement Deciles")+
+theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.4), hjust = .5))
+
+@
+
+\section {Picture Variables}
+
+We first create a combined excel file with ALL the relevant variables, so that we can run a regression model eventually. 
+
+\subsection *{Combining}
+<<>>=
+marc590 = read.csv("590MarcNorms.csv", header = TRUE, sep = ",") 
+ipnp = read.csv("IPNPnorms.csv", header = TRUE, sep = ",")
+ipnp = ipnp[,c(2,3, 5)]
+multipic = read.csv("MultipicNorms.csv", header = TRUE, sep = ",")
+item_elp = read.csv("DegradedItems_ELP.csv", header = TRUE, sep = ",")  
+multipic = multipic[,c(3,11)]
+AoA_main = AoA[,c(1,11)]
+
+item_all = Reduce(function(x, y) merge(x, y, all=TRUE), 
+                  list(marc590, ipnp, item_elp, multipic, AoA_main))
+
+items = read.csv("Degraded_ItemList.csv", header = TRUE, sep = ",")
+  
+item_final = dplyr::inner_join(items, item_all)
+## this file currently has many duplicates so we remove these in excel
+## note that some objects had multiple values for Visual Complexity, in
+## which case a mean value was chosen. 
+write.csv(item_final, file = "item_duplicates.csv")
+@
+
+\subsection *{Variable Correlations}
+
+<<>>=
+item_descriptives = read.csv("item_finaldescriptives.csv", 
+                             header = TRUE, sep = ",")
+x = item_descriptives[complete.cases(item_descriptives),]
+ 
+cor_table = Hmisc::rcorr(as.matrix(x[,c(4,7,8,10,11,12)]))
+@
+
+\subsection *{Merging with Experiment Data}
+
+<<>>=
+## final data is in pic_withAoA_z (for separate z-scoring) and in new_z_AOA for combined z-scoring  
+## need to merge with item_descriptives
+
+final_pic_data_1 = merge(pic_withAoA_z, item_descriptives, by = "Object")
+final_pic_data_1= final_pic_data_1[order(final_pic_data_1$Subject),]
+
+
+final_pic_data_2 = merge(new_z_AoA, item_descriptives, by = "Object")
+final_pic_data_2= final_pic_data_2[order(final_pic_data_2$Subject),]
+
+@
+
+
+\section {HLMs}
+
+\subsection* {z-RT}
+
+\subsubsection *{Basic Variables}
+
+<<>>=
+library(lme4)
+p0 = lmer(data = final_pic_data_2, zRT_trim ~ 1 + (1|Subject) + (1|Trial))
+summary(p0)
+reghelper::ICC(p0)
+
+
+p1 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + 
+            (1|Subject) + (1|Trial))
+summary(p1)
+
+p2 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+            (1|Subject) + (1|Trial))
+summary(p2)
+
+p3 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                            Length +
+            (1|Subject) + (1|Trial))
+summary(p3)
+@
+
+\subsubsection *{Adding Degradation}
+
+<<>>=
+p4 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                            Length + PictureType + 
+            (1|Subject) + (1|Trial))
+summary(p4)
+@
+
+\subsubsection * {Adding Freq and AoA}
+
+<<>>=
+p5 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                            Length + PictureType + AoA_Kup_lem.x +
+            (1|Subject) + (1|Trial))
+summary(p5)
+
+
+p6 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                            Length + PictureType*Log_Freq_HAL +
+            (1|Subject) + (1|Trial))
+summary(p6)
+
+p7 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                       Length + PictureType + AoA_Kup_lem.x + Log_Freq_HAL +
+            (1|Subject) + (1|Trial))
+summary(p7)
+
+## interaction models: not sig: tried all 2-ways and 3-ways
+
+p8 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+                            Length + PictureType*AoA_Kup_lem.x*Log_Freq_HAL + 
+            (1|Subject) + (1|Trial))
+summary(p8)
+@
+
+\section {Plotting Final Model: p5}
+
+<<echo=FALSE, fig=TRUE>>=
+
+#p5 = lmer(data = final_pic_data_2, zRT_trim ~ H.statistic + VISUAL_COMPLEXITY + 
+ #                           Length + PictureType + AoA_Kup_lem.x +
+  #          (1|Subject) + (1|Trial))
+#summary(p5)
+
+fixed.frame <-
+  data.frame(
+    expand.grid(
+      # here, you add values for your time variable and predictors
+      H.statistic = 0.6739707,
+      VISUAL_COMPLEXITY = 2.567387,
+      Length = 2.567387,
+      PictureType = factor(c("DegradedPicture", "FullPicture")),
+      AoA_Kup_lem.x = seq(2,10,1))) 
+      
+fixed.frame$pred = predict(p5, newdata = fixed.frame, re.form = NA)
+
+fixed.frame %>%
+  mutate(Degradation = factor(PictureType, levels = unique(PictureType),
+                          labels = c("Degraded", "Intact"))) %>%
+  ggplot(aes(x = AoA_Kup_lem.x, y = pred, 
+             group = Degradation, color = Degradation)) +
+    geom_line(size = 1) +
+        labs(x = "AoA", y = "Predicted Values for z-RT",
+         title = "Plot for Final Picture Naming Model
+         (at mean values for covariates)") +
+    theme_few()+
+    theme(axis.text = element_text(face = "bold", size = rel(1)),
+          axis.title = element_text(face = "bold", size = rel(1)),
+          legend.title = element_text(face = "bold", size = rel(1)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+
+\section {Plotting Final Model: p6}
+
+<<echo=FALSE, fig=TRUE>>=
+fixed.frame <-
+  data.frame(
+    expand.grid(
+      # here, you add values for your time variable and predictors
+      H.statistic = 0.6739707,
+      VISUAL_COMPLEXITY = 2.567387,
+      Length = 2.567387,
+      PictureType = factor(c("DegradedPicture", "FullPicture")),
+      Log_Freq_HAL = seq(5,13,1))) 
+      
+fixed.frame$pred = predict(p6, newdata = fixed.frame, re.form = NA)
+
+fixed.frame %>%
+  mutate(Degradation = factor(PictureType, levels = unique(PictureType),
+                          labels = c("Degraded", "Intact"))) %>%
+  ggplot(aes(x = Log_Freq_HAL, y = pred, 
+             group = Degradation, color = Degradation)) +
+    geom_line(size = 1) +
+        labs(x = "Log HAL Freq", y = "Predicted Values for z-RT",
+         title = "Plot for Alternate Picture Naming Model
+         (at mean values for covariates)") +
+    theme_few()+
+    theme(axis.text = element_text(face = "bold", size = rel(1)),
+          axis.title = element_text(face = "bold", size = rel(1)),
+          legend.title = element_text(face = "bold", size = rel(1)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+\section {Plotting Final Model: p7}
+
+<<echo=FALSE, fig=TRUE>>=
+
+fixed.frame <- final_pic_data_2 %>% 
+  dplyr::summarise(mean = mean(Log_Freq_HAL, na.rm = T), 
+            sd = sd(Log_Freq_HAL, na.rm = T))
+
+fixed.frame <-
+  data.frame(
+    expand.grid(
+      # here, you add values for your time variable and predictors
+      H.statistic = 0.6739707,
+      VISUAL_COMPLEXITY = 2.567387,
+      Length = 2.567387,
+      PictureType = factor(c("DegradedPicture", "FullPicture")),
+      Log_Freq_HAL = c(fixed.frame$mean-fixed.frame$sd,
+                     fixed.frame$mean,
+                     fixed.frame$mean+fixed.frame$sd),
+      AoA_Kup_lem.x = seq(2,10,1))) 
+      
+## tried both p7 (with no interaction), and p8 (with 3-way interaction)
+fixed.frame$pred = predict(p8, newdata = fixed.frame, re.form = NA)
+
+fixed.frame %>%
+  mutate(Degradation = factor(PictureType, levels = unique(PictureType),
+                          labels = c("Degraded", "Intact")),
+         Frequency = factor(Log_Freq_HAL, levels = unique(Log_Freq_HAL),
+        labels = c("Low Frequency", "Mean Frequency", "High Frequency"))) %>%
+  ggplot(aes(x = AoA_Kup_lem.x, y = pred, 
+             group = Degradation, color = Degradation)) +
+    geom_line(size = 1.03) +
+        labs(x = "AoA", y = "Predicted Values for z-RT",
+         title = "3-way Picture Naming Model
+         (at mean values for covariates)") +
+    theme_few()+
+  facet_wrap(~Frequency) + 
+    theme(axis.text = element_text(face = "bold", size = rel(1)),
+          axis.title = element_text(face = "bold", size = rel(1)),
+          legend.title = element_text(face = "bold", size = rel(1)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+
+
+\end{document}
