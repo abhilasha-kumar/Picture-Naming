@@ -34,7 +34,7 @@
 
 <<>>=
 pic = read.csv("CompiledPictureNaming_Degraded.csv", header = TRUE, sep = ",")
-pic_mainvariables = pic[, c(2,3,22,26,28,31,33,36,37,38)]
+pic_mainvariables = pic[, c(2,3,22,26,28,31,33,36,37,8)]
 colnames(pic_mainvariables) = c("Subject", "Session", "Trial", "Object",
                 "PictureType", "RT", "ObjectNo",  "Accuracy",
                 "InvalidTrial", "ItemCount")
@@ -354,7 +354,7 @@ ggplot(agg_pic_plot_rmisc, aes(x = PictureType, y = Accuracy))+
 agg_pic_validRT_plot_rmisc = summarySE(new_z, 
                       measurevar = "zRT",
                       groupvars = c("PictureType"))
-
+agg_pic_validRT_plot_rmisc$zRT = round(agg_pic_validRT_plot_rmisc$zRT, digits = 2)
 ggplot(agg_pic_validRT_plot_rmisc, aes(x = PictureType, y = zRT))+
  geom_bar(stat = "identity", position = "dodge", width = 0.5, fill = "seagreen")+
   geom_errorbar(aes(ymin = zRT - ci, ymax = zRT + ci),
@@ -599,6 +599,7 @@ item_descriptives = read.csv("item_finaldescriptives.csv",
 x = item_descriptives[complete.cases(item_descriptives),]
  
 cor_table = Hmisc::rcorr(as.matrix(x[,c(4,7,8,10,11,12)]))
+cor_table
 @
 
 \subsection *{Merging with Experiment Data}
@@ -773,6 +774,7 @@ fixed.frame <-
 ## tried both p7 (with no interaction), and p8 (with 3-way interaction)
 fixed.frame$pred = predict(p8, newdata = fixed.frame, re.form = NA)
 
+fixed.frame$pred = round(fixed.frame$pred, digits = 2)
 fixed.frame %>%
   mutate(Degradation = factor(PictureType, levels = unique(PictureType),
                           labels = c("Degraded", "Intact")),
