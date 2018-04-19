@@ -347,7 +347,12 @@ ggplot(agg_pic_plot_rmisc, aes(x = PictureType, y = Accuracy))+
                 width=.05, position=position_dodge(.5)) +
   theme_few()+
   xlab("Picture Type") + ylab("Mean Accuracy") + 
-  ggtitle("Effect of Picture Quality on Accuracy")
+  ggtitle("Effect of Picture Quality on Accuracy") +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
 @
 
 <<fig=TRUE>>=
@@ -361,7 +366,12 @@ ggplot(agg_pic_validRT_plot_rmisc, aes(x = PictureType, y = zRT))+
                 width=.05, position=position_dodge(.5)) +
   theme_few()+
   xlab("Picture Type") + ylab("Mean zRT") + 
-  ggtitle("Effect of Picture Quality on Reaction Times")
+  ggtitle("Effect of Picture Quality on Reaction Times") +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
 @
 
 \section{Fetching AoA data and Merging}
@@ -393,7 +403,11 @@ ggplot(new_z_AoA, aes(x = AoA_Kup_lem, y = zRT_trim))+
   geom_smooth(method = "lm", color = "purple")+
  theme_few()+
   xlab("Age of Acquisition") + ylab("z-RT") + 
-  ggtitle("z-scored Response Time as a\n function of Age of Acquisition")
+  ggtitle("z-scored Response Time as a\n function of Age of Acquisition")+
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 \subsection* {Raw Plot by Picture Type}
 <<fig=TRUE>>=
@@ -403,7 +417,13 @@ ggplot(new_z_AoA, aes(x = AoA_Kup_lem, y = RT,
   geom_smooth(method = "lm", se = FALSE)+
  theme_few()+
   xlab("Age of Acquisition") + ylab("Raw RT") + 
-  ggtitle("RT as a function of AoA")
+  ggtitle("RT as a function of AoA") +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+  
 @
 
 \section {Regressions}
@@ -439,6 +459,7 @@ theme_classic() +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
           legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 
@@ -455,10 +476,11 @@ fixed.frame %>%
       geom_line(size = 1, color = "purple") + 
     xlab("Age of Acquisition") + ylab ("z-RT")+ 
   ggtitle("Model Fit: zRT by AoA")+
-theme_classic() +
+theme_classic()  +
     theme(axis.text = element_text(face = "bold", size = rel(1.2)),
           axis.title = element_text(face = "bold", size = rel(1.2)),
           legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 
@@ -711,10 +733,11 @@ fixed.frame %>%
         labs(x = "AoA", y = "Predicted Values for z-RT",
          title = "Plot for Final Picture Naming Model
          (at mean values for covariates)") +
-    theme_few()+
-    theme(axis.text = element_text(face = "bold", size = rel(1)),
-          axis.title = element_text(face = "bold", size = rel(1)),
-          legend.title = element_text(face = "bold", size = rel(1)),
+    theme_few() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 
@@ -743,14 +766,62 @@ fixed.frame %>%
         labs(x = "Log HAL Freq", y = "Predicted Values for z-RT",
          title = "Plot for Alternate Picture Naming Model
          (at mean values for covariates)") +
-    theme_few()+
-    theme(axis.text = element_text(face = "bold", size = rel(1)),
-          axis.title = element_text(face = "bold", size = rel(1)),
-          legend.title = element_text(face = "bold", size = rel(1)),
+    theme_few() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
           plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
 @
 
 \section {Plotting Final Model: p7}
+
+<<echo=FALSE, fig=TRUE>>=
+
+fixed.frame <- final_pic_data_2 %>% 
+  dplyr::summarise(mean = mean(Log_Freq_HAL, na.rm = T), 
+            sd = sd(Log_Freq_HAL, na.rm = T))
+
+fixed.frame <-
+  data.frame(
+    expand.grid(
+      # here, you add values for your time variable and predictors
+      H.statistic = 0.6739707,
+      VISUAL_COMPLEXITY = 2.567387,
+      Length = 2.567387,
+      PictureType = factor(c("DegradedPicture", "FullPicture")),
+      Log_Freq_HAL = c(fixed.frame$mean-fixed.frame$sd,
+                     fixed.frame$mean,
+                     fixed.frame$mean+fixed.frame$sd),
+      AoA_Kup_lem.x = seq(2,10,1))) 
+      
+## tried both p7 (with no interaction), and p8 (with 3-way interaction)
+fixed.frame$pred = predict(p7, newdata = fixed.frame, re.form = NA)
+
+fixed.frame$pred = round(fixed.frame$pred, digits = 2)
+fixed.frame %>%
+  mutate(Degradation = factor(PictureType, levels = unique(PictureType),
+                          labels = c("Degraded", "Intact")),
+         Frequency = factor(Log_Freq_HAL, levels = unique(Log_Freq_HAL),
+        labels = c("Low Frequency", "Mean Frequency", "High Frequency"))) %>%
+  ggplot(aes(x = AoA_Kup_lem.x, y = pred, 
+             group = Degradation, color =Degradation )) +
+    geom_line(size = 1.03) +
+        labs(x = "AoA", y = "Predicted Values for z-RT",
+         title = "3-way Picture Naming Model
+         (at mean values for covariates)") +
+    theme_few()+
+  facet_wrap(~Frequency)  +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          legend.text = element_text(size = rel(1.2)),
+          strip.text.x = element_text(face = "bold", size = rel(1.4)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+@
+
+
+\section {Plotting Final Model: p8}
 
 <<echo=FALSE, fig=TRUE>>=
 
